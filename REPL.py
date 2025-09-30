@@ -2,15 +2,17 @@ from sys import argv
 from os import path
 
 
-def startup():
-	if len(argv) != 3:
+dir = "VFS"
+
+def startup(): # Считавыние параметров командной строки и их проверка
+	if len(argv) != 3: # Если передан неправильный набор аргументов
 		print("invalid set of arguments")
 		exit()
-	if "C:\\" not in argv[1]:
+	if "C:\\" not in argv[1]: # Если не указан полный путь до VFS
 		argv[1] = path.dirname(__file__) + "\\" + argv[1]
-	if "C:\\" not in argv[2]:
+	if "C:\\" not in argv[2]: # Если не указан полный путь до стартого скрипта
 		argv[2] = path.dirname(__file__) + "\\" + argv[2]
-	if not (path.exists(argv[1]) or path.exists(argv[2])):
+	if not (path.exists(argv[1]) or path.exists(argv[2])): # Если не существует одного из файлов выводим ошибку
 		print("invalid set of arguments")
 		exit()
 	print("\nVfs location -> " + argv[1])
@@ -24,46 +26,54 @@ def cd(argc):  # функция, вызываемая по команде cd
 def ls(argc):  # функция, вызываемая по команде ls
 	return "ls " + " ".join([i.strip('"') for i in argc])
 
+def script(p): # функция, вызываемая по команде script
+	if p: # Если список аргументов не пустой
+		p[0] = p[0].strip('"') # Парсим
+		if "C:\\" not in p[0]: # если путь не полный
+			p[0] = path.dirname(__file__) + "\\" + p[0]
+	if path.exists(p[0]): # Если файл скрипта существует, запускаем его
+		init_script(p[0])
+		return ""
+	else:
+		return "script: invalid path"
 
-class UnixEmulator:
-	dir = "VFS"
+def init_command(com, argc):
+	if com in commands:  # если команда имеется в словаре commands, запускаем соответствующую функцию
+		# если в списке argc имеются аргументы данные без кавычек -> выводим ошибку
+		if [i for i in argc if i[0] != '"' or i[-1] != '"']:
+			return [com + ": invalid arguments", False]
+		return [commands[com](argc), True]
+	else:
+		return [com + ": no such command", False]  # иначе выводим ошибку
 
-	commands = {  # словарь команд и соответсвующих функций функций
-		"cd": cd,
-		"ls": ls,
-		"exit": exit
-	}
-
-	def init_command(self, com, argc):
-		if com in self.commands:  # если команда имеется в словаре commands, запускаем соответствующую функцию
-
-			# если в списке argc имеются аргументы данные без кавычек -> выводим ошибку
-			if [i for i in argc if i[0] != '"' or i[-1] != '"']:
-				return [com + ": invalid arguments", False]
-			return [self.commands[com](argc), True]
-		else:
-			return [com + ": no such command", False]  # иначе выводим ошибку
-
-	def startup_script(self):
-		out = ""
-		print("Startup script:\n")
-		with open(argv[2]) as f:
-			for i in f:
-				com, *argc = i.split()
-				buf = self.init_command(com, argc)
-				if not buf[1]:
-					print("The script terminated with an error\n")
-					return
-				out += buf[0] + "\n"
-		print(out)
-
-	def main_loop(self):
-		startup()
-		self.startup_script()
-		while True:
-			print(self.dir + " >", end=" ")  # вывод приглашения к вводу
-			com, *argc = input().split()  # ввод команды и аргрументов
-			print(self.init_command(com, argc)[0])
+def init_script(p): #Запуск скрипта
+	out = ""
+	with open(p) as f: # Открываем скрипт
+		for i in f: # Считываение команд
+			com, *argc = i.split()
+			buf = init_command(com, argc)
+			if not buf[1]: # Если команда вернула ошибку, завершаем скрипт
+				print("The script terminated with an error\n")
+				return
+			out += buf[0] + "\n"
+	print(out)
 
 
-UnixEmulator().main_loop()
+
+commands = {  # словарь команд и соответсвующих функций функций
+	"cd": cd,
+	"ls": ls,
+	"script": script,
+	"exit": exit
+}
+def main(): # Основная функция
+	startup()
+	print("Startup script:\n")
+	init_script(argv[2])
+	while True:
+		print(dir + " >", end=" ")  # вывод приглашения к вводу
+		com, *argc = input().split()  # ввод команды и аргрументов
+		print(init_command(com, argc)[0])
+
+
+main()
